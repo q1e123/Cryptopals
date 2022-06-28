@@ -2,42 +2,53 @@ from queue import PriorityQueue
 import binascii
 from collections import Counter
 
+def get_chunks(data, chunk_size):
+    chunks = [data[i:i+chunk_size] for i in range(0,len(data),chunk_size)]
+    return chunks
+
 def get_hamming(x, y):
     hamming = 0
     for byte1, byte2 in zip(x, y):
         hamming += bin(byte1 ^ byte2).count('1')
     return hamming
 
-def get_edit_disance(secret, key_size):
-    x = secret[:key_size]
-    y = secret[key_size : 2 * key_size]
-    edit = get_hamming(x, y) / key_size
+def get_edit_disance(cipher_text, key_size):
+    chunk_list = get_chunks(cipher_text, key_size)
+    normalized_distance_sum = 0
+    for x, y in zip(chunk_list[:-1], chunk_list[1:]):
+        distance = get_hamming(x, y) / key_size
+        normalized_distance = distance / key_size
+        normalized_distance_sum += normalized_distance
+    average = normalized_distance_sum / len(chunk_list)
+    return average
 
-def get_key_size_heap(secret):
+def get_key_size_heap(cipher_text):
     key_size_heap = PriorityQueue()
-    for guess in range(0, 40):
-        guess_edit_distance = get_edit_disance(secret, guess)
+    for guess in range(2, 40):
+        guess_edit_distance = get_edit_disance(cipher_text, guess)
         key_size_heap.put((guess_edit_distance, guess))
+    return key_size_heap
 
 def get_key_size(key_size_heap):
     key_size_list = []
-    for _ in ragne(4):
+    for _ in range(4):
         item = key_size_heap.get()
         key_size_list.push(item[1])
     key_size = sum(key_size_list) // len(key_size_list)
     return key_size
 
-def get_chunks(cipher_text, chunk_size):
-    chunk_list = [cipher_text[i::chunk_size] for i range(chunk_size)]
-    return chunk_list
-
-def get_transposed_chunks(chunk_list):
-    transposed_chunks = []
-    for i in range(chunk_size):
-        transposed = [chunk_list[i][j] for j in range(chunk_size)]
-        transposed_chunks.push(transposed)
+def get_transposed_chunks(cipher, key_size):
+    transposed_chunks = dict.fromkeys(range(key_size))
+    i = 0
+    for _ in range(key_size):
+        transposed_chunks[_] = []
+    for data in cipher:
+        if (i == key_size): 
+            i = 0
+        transposed_chunks[i].append(data)
+        i += 1
     return transposed_chunks
-
+    
 def single_byte_xor(text, key):
     return bytes([ch ^ key for ch in text])
 
@@ -53,7 +64,7 @@ def get_fitting_quotient(text, language_frequency_dictionary):
 def get_decoded_heap(text, language_frequency_dictionary):
     decoded_heap = PriorityQueue()
     for key in range(256):
-        decoded = single_byte_xor(secret, key)
+        decoded = single_byte_xor(cipher_text, key)
         fitting_quotient = get_fitting_quotient(decoded.lower(), language_frequency_dictionary)
         priority = fitting_quotient
         decoded_heap.put((priority, decoded))
@@ -70,8 +81,8 @@ language_frequency_english = {
 }
 
 def crack_chunk(chunk):
-    secret = binascii.unhexlify(chunk)
-    decoded_heap = get_decoded_heap(secret, language_frequency_english)
+    cipher_text = binascii.unhexlify(chunk)
+    decoded_heap = get_decoded_heap(cipher_text, language_frequency_english)
     while(not decoded_heap.empty()):
         item = decoded_heap.get()
         priority = item[0]
